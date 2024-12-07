@@ -1,0 +1,26 @@
+2024-12-07 15:25:59,023 - metrics_client - INFO - Starting metrics collection and submission...
+2024-12-07 15:26:01,141 - metrics_client - INFO - Server Response: {
+  "message": "Metrics recorded",
+  "snapshot": {
+    "device_name": "client-Oisin-Oisin",
+    "id": 20,
+    "num_processes": 429,
+    "num_threads": 16,
+    "ram_usage_mb": 14628.546875,
+    "timestamp": "2024-12-07T15:26:01"
+  },
+  "status": "success"
+}
+2024-12-07 15:26:13,221 - metrics_client - INFO - Server Response: {
+  "message": "Metrics recorded",
+  "snapshot": {
+    "device_name": "client-Oisin-Oisin",
+    "id": 21,
+    "num_processes": 442,
+    "num_threads": 16,
+    "ram_usage_mb": 14647.48828125,
+    "timestamp": "2024-12-07T15:26:13"
+  },
+  "status": "success"
+}
+2024-12-07 15:26:14,554 - metrics_client - INFO - Metrics collection stopped by user.

@@ -1,0 +1,27 @@
+# Server Configuration
+server:
+  host: localhost
+  port: 5000
+  endpoint: /metrics
+  protocol: http
+
+# Client Configuration
+client:
+  device_name_prefix: client
+  metrics_interval_seconds: 10
+  max_retry_attempts: 3
+  retry_delay_seconds: 5
+
+# Logging Configuration
+logging:
+  level: INFO
+  file: 
+    enabled: true
+    path: logs/application.log
+  console:
+    enabled: true
+
+# Database Configuration
+database:
+  type: sqlite
+  path: data.db
