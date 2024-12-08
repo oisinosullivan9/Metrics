@@ -1,2 +1,7 @@
 Flask
 gunicorn
+pyYAML
+flask-sqlalchemy
+psutil
+requests
+sqlalchemy
