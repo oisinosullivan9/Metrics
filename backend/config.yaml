@@ -1,9 +1,9 @@
 # Server Configuration
 server:
-  host: localhost
-  port: 3000
+  host: device-metrics.onrender.com
+  port: 443
   endpoint: /metrics
-  protocol: http
+  protocol: https
 
 # Client Configuration
 client:
