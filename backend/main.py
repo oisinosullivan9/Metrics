@@ -53,17 +53,22 @@ db = SQLAlchemy(app)
 # Setup logging
 logger = setup_logging(config)
 
-# ORM Model for Device Performance
+# Updated ORM Model to include both device performance and ESP32 temperature
 class DevicePerformanceSnapshot(db.Model):
     __tablename__ = 'device_performance_snapshot'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     device_name = Column(String(255), nullable=False)
     timestamp = Column(DateTime, default=func.now())
-    num_threads = Column(Integer, nullable=False)
-    num_processes = Column(Integer, nullable=False)
-    ram_usage_mb = Column(Float, nullable=False)
-
+    
+    # Laptop/System Metrics
+    num_threads = Column(Integer, nullable=True)
+    num_processes = Column(Integer, nullable=True)
+    ram_usage_mb = Column(Float, nullable=True)
+    
+    # ESP32 Metrics
+    temperature = Column(Float, nullable=True)
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -71,32 +76,37 @@ class DevicePerformanceSnapshot(db.Model):
             'timestamp': self.timestamp.isoformat(),
             'num_threads': self.num_threads,
             'num_processes': self.num_processes,
-            'ram_usage_mb': self.ram_usage_mb
+            'ram_usage_mb': self.ram_usage_mb,
+            'temperature': self.temperature
         }
 
 # Ensure database and tables are created
 with app.app_context():
     db.create_all()
 
-# Flask endpoints
+# Updated metrics endpoint to handle both system and ESP32 metrics
 @app.route('/metrics', methods=['POST'])
 def receive_metrics():
     try:
-        #validate incoming data
+        # Validate incoming data
         data = request.get_json()
-        # Check for required fields
-        required_fields = ['device_name', 'num_threads', 'num_processes', 'ram_usage_mb']
-        for field in required_fields:
-            if field not in data:
-                logger.warning(f'Missing required field: {field}')
-                return jsonify({'status': 'error', 'message': f'Missing required field: {field}'}), 400
+        
+        # Check for required device_name field
+        if 'device_name' not in data:
+            logger.warning('Missing required field: device_name')
+            return jsonify({'status': 'error', 'message': 'Missing required field: device_name'}), 400
+        
         # Create a new snapshot
         new_snapshot = DevicePerformanceSnapshot(
             device_name=data['device_name'],
-            num_threads=data['num_threads'],
-            num_processes=data['num_processes'],
-            ram_usage_mb=data['ram_usage_mb']
+            # Laptop/System Metrics (optional)
+            num_threads=data.get('num_threads'),
+            num_processes=data.get('num_processes'),
+            ram_usage_mb=data.get('ram_usage_mb'),
+            # ESP32 Metrics (optional)
+            temperature=data.get('temperature')
         )
+        
         db.session.add(new_snapshot)
         db.session.commit()
         logger.info(f'Metrics recorded for device: {data["device_name"]}')
@@ -108,36 +118,10 @@ def receive_metrics():
         logger.error(f'Error receiving metrics: {str(e)}')
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/metrics', methods=['GET'])
-def get_metrics():
-    try:
-        #optional query parameters to filter and limit the results
-        device_name = request.args.get('device_name')
-        limit = request.args.get('limit', default=100, type=int)
-        if device_name:
-            snapshots = DevicePerformanceSnapshot.query \
-                .filter_by(device_name=device_name) \
-                .order_by(DevicePerformanceSnapshot.timestamp.desc()) \
-                .limit(limit) \
-                .all()
-        else:
-            snapshots = DevicePerformanceSnapshot.query \
-                .order_by(DevicePerformanceSnapshot.timestamp.desc()) \
-                .limit(limit) \
-                .all()
-        
-        logger.info(f'Retrieved {len(snapshots)} metrics{" for device " + device_name if device_name else ""}')
-        return jsonify({'status': 'success', 'metrics': [snapshot.to_dict() for snapshot in snapshots]}), 200
-    
-    except Exception as e:
-        logger.error(f'Error retrieving metrics: {str(e)}')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-# Integrate Dash with Flask
 dash_app = dash.Dash(__name__, server=app, url_base_pathname='/dashboard/')
-
+# Updated dashboard layout to include temperature
 dash_app.layout = html.Div([
-    html.H1("Device Performance Dashboard"),
+        html.H1("Device Performance Dashboard"),
     html.Div([
         html.H2("Gauge Chart for Device Metrics"),
         html.Div([
@@ -181,27 +165,57 @@ dash_app.layout = html.Div([
             options=[
                 {'label': 'RAM Usage (MB)', 'value': 'ram_usage_mb'},
                 {'label': 'Num Threads', 'value': 'num_threads'},
-                {'label': 'Num Processes', 'value': 'num_processes'}
+                {'label': 'Num Processes', 'value': 'num_processes'},
+                {'label': 'Temperature (°C)', 'value': 'temperature'}  # New option
             ],
             placeholder="Select a metric",
         ),
         dcc.Graph(id='line-graph'),
     ])
 ])
-# Callback to populate the dropdown with device names
-@dash_app.callback(
-    Output('device-dropdown', 'options'),
-    Input('interval-component', 'n_intervals')  # Periodically refresh device names
-)
-def update_device_dropdown(_):
-    device_names = db.session.query(DevicePerformanceSnapshot.device_name).distinct().all()
-    return [{'label': name[0], 'value': name[0]} for name in device_names]
 
-# Callback to update the gauge chart
+# Updated line graph callback to support temperature
+@dash_app.callback(
+    Output('line-graph', 'figure'),
+    [Input('metric-dropdown', 'value'),
+     Input('device-dropdown', 'value')]
+)
+def update_line_graph(selected_metric, device_name):
+    if not device_name or not selected_metric:
+        return go.Figure()
+
+    snapshots = DevicePerformanceSnapshot.query \
+        .filter_by(device_name=device_name) \
+        .order_by(DevicePerformanceSnapshot.timestamp.asc()) \
+        .all()
+
+    if not snapshots:
+        return go.Figure()
+
+    timestamps = [snapshot.timestamp for snapshot in snapshots]
+    values = [getattr(snapshot, selected_metric) for snapshot in snapshots]
+
+    # Special handling for temperature to add °C
+    title = selected_metric.replace('_', ' ').title()
+    if selected_metric == 'temperature':
+        title += ' (°C)'
+
+    figure = go.Figure(
+        data=go.Scatter(x=timestamps, y=values, mode='lines+markers', name=selected_metric),
+        layout=go.Layout(
+            title=f"{title} Over Time for {device_name}",
+            xaxis=dict(title="Time"),
+            yaxis=dict(title=title),
+        )
+    )
+
+    return figure
+
+# Update dashboard callbacks to support temperature
 @dash_app.callback(
     Output('gauge-chart', 'figure'),
     [Input('device-dropdown', 'value'),
-        Input('metric-dropdown-gauge', 'value')]
+     Input('metric-dropdown-gauge', 'value')]
 )
 def update_gauge(device_name, selected_metric):
     if not device_name or not selected_metric:
@@ -243,6 +257,15 @@ def update_gauge(device_name, selected_metric):
                 {'range': [400, 500], 'color': "red"}
             ],
             'title': "Number of Processes"
+        },
+        'temperature': {
+            'range': [0, 100],
+            'steps': [
+                {'range': [0, 30], 'color': "lightgreen"},
+                {'range': [30, 60], 'color': "yellow"},
+                {'range': [60, 100], 'color': "red"}
+            ],
+            'title': "Temperature (°C)"
         }
     }
 
@@ -261,76 +284,6 @@ def update_gauge(device_name, selected_metric):
             }
         )
     )
-    return figure
-
-# Callback to update the table dynamically
-@dash_app.callback(
-    Output('table-container', 'children'),
-    Input('interval-component', 'n_intervals')
-)
-def update_table(_):
-    snapshots = DevicePerformanceSnapshot.query.order_by(DevicePerformanceSnapshot.timestamp.desc()).all()
-    if not snapshots:
-        return html.Div("No data available.")
-
-    table_data = {
-        "ID": [snapshot.id for snapshot in snapshots],
-        "Device Name": [snapshot.device_name for snapshot in snapshots],
-        "Timestamp": [snapshot.timestamp.strftime('%Y-%m-%d %H:%M:%S') for snapshot in snapshots],
-        "Num Threads": [snapshot.num_threads for snapshot in snapshots],
-        "Num Processes": [snapshot.num_processes for snapshot in snapshots],
-        "RAM Usage (MB)": [snapshot.ram_usage_mb for snapshot in snapshots],
-    }
-
-    return dcc.Graph(
-        figure=go.Figure(
-            data=[
-                go.Table(
-                    header=dict(
-                        values=list(table_data.keys()),
-                        fill_color='paleturquoise',
-                        align='left'
-                    ),
-                    cells=dict(
-                        values=list(table_data.values()),
-                        fill_color='lavender',
-                        align='left'
-                    )
-                )
-            ]
-        )
-    )
-
-# Callback to update the line graph
-@dash_app.callback(
-    Output('line-graph', 'figure'),
-    [Input('metric-dropdown', 'value'),
-     Input('device-dropdown', 'value')]
-)
-def update_line_graph(selected_metric, device_name):
-    if not device_name or not selected_metric:
-        return go.Figure()
-
-    snapshots = DevicePerformanceSnapshot.query \
-        .filter_by(device_name=device_name) \
-        .order_by(DevicePerformanceSnapshot.timestamp.asc()) \
-        .all()
-
-    if not snapshots:
-        return go.Figure()
-
-    timestamps = [snapshot.timestamp for snapshot in snapshots]
-    values = [getattr(snapshot, selected_metric) for snapshot in snapshots]
-
-    figure = go.Figure(
-        data=go.Scatter(x=timestamps, y=values, mode='lines+markers', name=selected_metric),
-        layout=go.Layout(
-            title=f"{selected_metric.replace('_', ' ').title()} Over Time for {device_name}",
-            xaxis=dict(title="Time"),
-            yaxis=dict(title=selected_metric.replace('_', ' ').title()),
-        )
-    )
-
     return figure
 
 if __name__ == '__main__':
