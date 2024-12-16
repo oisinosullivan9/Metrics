@@ -5,3 +5,5 @@ flask-sqlalchemy
 psutil
 requests
 sqlalchemy
+dash
+plotly
