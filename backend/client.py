@@ -62,10 +62,13 @@ class MetricsClient:
         try:
             # Generate device name with prefix from config
             device_name = f"{self.client_config['device_name_prefix']}-{platform.node()}-{socket.gethostname()}"
+            #total number of threads
+            total_threads = sum(proc.num_threads() for proc in psutil.process_iter(attrs=['num_threads']))
+
             
             metrics = {
                 'device_name': device_name,
-                'num_threads': psutil.cpu_count(logical=True),
+                'num_threads': total_threads,
                 'num_processes': len(psutil.pids()),
                 'ram_usage_mb': psutil.virtual_memory().used / (1024 * 1024)  # Convert to MB
             }
