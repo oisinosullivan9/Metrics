@@ -53,6 +53,23 @@ db = SQLAlchemy(app)
 # Setup logging
 logger = setup_logging(config)
 
+#new ORM model for esp32 temperature metrics
+class ESP32TemperatureSnapshot(db.Model):
+    __tablename__ = 'esp32_temperature_snapshot'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_name = Column(String(255), nullable=False)
+    timestamp = Column(DateTime, default=func.now())
+    temperature = Column(Float, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'device_name': self.device_name,
+            'timestamp': self.timestamp.isoformat(),
+            'temperature': self.temperature,
+        }
+    
 # ORM Model for Device Performance
 class DevicePerformanceSnapshot(db.Model):
     __tablename__ = 'device_performance_snapshot'
@@ -133,6 +150,64 @@ def get_metrics():
         logger.error(f'Error retrieving metrics: {str(e)}')
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# New endpoint for ESP32 metrics
+@app.route('/esp32metrics', methods=['POST'])
+def receive_esp32_metrics():
+    try:
+        # Validate incoming data
+        data = request.get_json()
+        
+        # Check for required fields
+        required_fields = ['temperature']
+        for field in required_fields:
+            if field not in data:
+                logger.warning(f'Missing required field: {field}')
+                return jsonify({'status': 'error', 'message': f'Missing required field: {field}'}), 400
+        
+        # Create a new temperature snapshot
+        new_snapshot = ESP32TemperatureSnapshot(
+            device_name = data.get('device_name', 'ESP32'),
+            temperature=data['temperature']
+        )
+        db.session.add(new_snapshot)
+        db.session.commit()
+        
+        logger.info(f'Temperature metrics recorded')
+        return jsonify({'status': 'success', 'message': 'Temperature metrics recorded', 'snapshot': new_snapshot.to_dict()}), 201
+    
+    except Exception as e:
+        # Rollback the session in case of an error
+        db.session.rollback()
+        logger.error(f'Error receiving ESP32 metrics: {str(e)}')
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+# New endpoint to retrieve ESP32 metrics
+@app.route('/esp32metrics', methods=['GET'])
+def get_esp32_metrics():
+    try:
+        # Optional query parameters to filter and limit the results
+        device_name = request.args.get('device_name')
+        limit = request.args.get('limit', default=100, type=int)
+        
+        if device_name:
+            snapshots = ESP32TemperatureSnapshot.query \
+                .filter_by(device_name=device_name) \
+                .order_by(ESP32TemperatureSnapshot.timestamp.desc()) \
+                .limit(limit) \
+                .all()
+        else:
+            snapshots = ESP32TemperatureSnapshot.query \
+                .order_by(ESP32TemperatureSnapshot.timestamp.desc()) \
+                .limit(limit) \
+                .all()
+        
+        logger.info(f'Retrieved {len(snapshots)} ESP32 temperature metrics{" for device " + device_name if device_name else ""}')
+        return jsonify({'status': 'success', 'metrics': [snapshot.to_dict() for snapshot in snapshots]}), 200
+    
+    except Exception as e:
+        logger.error(f'Error retrieving ESP32 metrics: {str(e)}')
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
 # Integrate Dash with Flask
 dash_app = dash.Dash(__name__, server=app, url_base_pathname='/dashboard/')
 
