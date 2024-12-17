@@ -231,7 +231,8 @@ dash_app.layout = html.Div([
                     options=[
                         {'label': 'RAM Usage (MB)', 'value': 'ram_usage_mb'},
                         {'label': 'Num Threads', 'value': 'num_threads'},
-                        {'label': 'Num Processes', 'value': 'num_processes'}
+                        {'label': 'Num Processes', 'value': 'num_processes'},
+                        {'label': 'ESP32 Temperature', 'value': 'temperature'}
                     ],
                     placeholder="Select a metric",
                     style={'width': '100%'}
@@ -289,15 +290,20 @@ def update_gauge(device_name, selected_metric):
     if not device_name or not selected_metric:
         return go.Figure()
 
-    snapshot = DevicePerformanceSnapshot.query \
-        .filter_by(device_name=device_name) \
-        .order_by(DevicePerformanceSnapshot.timestamp.desc()) \
-        .first()
-    
+    if selected_metric == 'temperature':
+        snapshot = ESP32TemperatureSnapshot.query \
+            .filter_by(device_name=device_name) \
+            .order_by(ESP32TemperatureSnapshot.timestamp.desc()) \
+            .first()
+    else:
+        snapshot = DevicePerformanceSnapshot.query \
+            .filter_by(device_name=device_name) \
+            .order_by(DevicePerformanceSnapshot.timestamp.desc()) \
+            .first()
+        
     if not snapshot:
-        return go.Figure()
-    
-    # Determine the value and range based on the selected metric
+            return go.Figure()
+
     metric_configs = {
         'ram_usage_mb': {
             'range': [0, 16000],
@@ -325,11 +331,25 @@ def update_gauge(device_name, selected_metric):
                 {'range': [400, 500], 'color': "red"}
             ],
             'title': "Number of Processes"
+        },
+        'temperature': {
+            'range': [0, 45],  # Adjust range as per your expected temperature values
+            'steps': [
+                {'range': [0, 15], 'color': "lightgreen"},
+                {'range': [15, 30], 'color': "yellow"},
+                {'range': [30, 45], 'color': "red"}
+                ],
+                'title': "Temperature (°C)"
+            }
         }
-    }
 
     config = metric_configs.get(selected_metric, {})
-    value = getattr(snapshot, selected_metric)
+
+    # Get the value differently for temperature vs other metrics
+    if selected_metric == 'temperature':
+        value = snapshot.temperature
+    else:
+        value = getattr(snapshot, selected_metric)
 
     figure = go.Figure(
         go.Indicator(
@@ -344,6 +364,7 @@ def update_gauge(device_name, selected_metric):
         )
     )
     return figure
+
 
 # Callback to update the table dynamically
 @dash_app.callback(
