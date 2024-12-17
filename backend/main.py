@@ -256,7 +256,8 @@ dash_app.layout = html.Div([
             options=[
                 {'label': 'RAM Usage (MB)', 'value': 'ram_usage_mb'},
                 {'label': 'Num Threads', 'value': 'num_threads'},
-                {'label': 'Num Processes', 'value': 'num_processes'}
+                {'label': 'Num Processes', 'value': 'num_processes'},
+                {'label': 'ESP32 Temperature', 'value': 'temperature'}
             ],
             placeholder="Select a metric",
         ),
@@ -269,8 +270,14 @@ dash_app.layout = html.Div([
     Input('interval-component', 'n_intervals')  # Periodically refresh device names
 )
 def update_device_dropdown(_):
-    device_names = db.session.query(DevicePerformanceSnapshot.device_name).distinct().all()
-    return [{'label': name[0], 'value': name[0]} for name in device_names]
+    # Combine device names from both performance and temperature snapshots
+    performance_devices = db.session.query(DevicePerformanceSnapshot.device_name).distinct().all()
+    temperature_devices = db.session.query(ESP32TemperatureSnapshot.device_name).distinct().all()
+    
+    # Combine and remove duplicates
+    all_devices = set(device[0] for device in performance_devices + temperature_devices)
+    
+    return [{'label': name, 'value': name} for name in all_devices]
 
 # Callback to update the gauge chart
 @dash_app.callback(
@@ -385,22 +392,35 @@ def update_table(_):
 def update_line_graph(selected_metric, device_name):
     if not device_name or not selected_metric:
         return go.Figure()
-
-    snapshots = DevicePerformanceSnapshot.query \
-        .filter_by(device_name=device_name) \
-        .order_by(DevicePerformanceSnapshot.timestamp.asc()) \
-        .all()
+    
+    #Handle ESP32 temperature metrics
+    if selected_metric == 'temperature':
+        snapshots = ESP32TemperatureSnapshot.query \
+            .filter_by(device_name=device_name) \
+            .order_by(ESP32TemperatureSnapshot.timestamp.asc()) \
+            .all()
+    else:    
+        snapshots = DevicePerformanceSnapshot.query \
+            .filter_by(device_name=device_name) \
+            .order_by(DevicePerformanceSnapshot.timestamp.asc()) \
+            .all()
 
     if not snapshots:
         return go.Figure()
-
-    timestamps = [snapshot.timestamp for snapshot in snapshots]
-    values = [getattr(snapshot, selected_metric) for snapshot in snapshots]
+    
+    if selected_metric == 'temperature':
+        timestamps = [snapshot.timestamp for snapshot in snapshots]
+        values = [snapshot.temperature for snapshot in snapshots]
+        metric_title = "ESP32 Temperature"
+    else:
+        timestamps = [snapshot.timestamp for snapshot in snapshots]
+        values = [getattr(snapshot, selected_metric) for snapshot in snapshots]
+        metric_title = selected_metric.replace('_', ' ').title()
 
     figure = go.Figure(
         data=go.Scatter(x=timestamps, y=values, mode='lines+markers', name=selected_metric),
         layout=go.Layout(
-            title=f"{selected_metric.replace('_', ' ').title()} Over Time for {device_name}",
+            title=f"{metric_title} Over Time for {device_name}",
             xaxis=dict(title="Time"),
             yaxis=dict(title=selected_metric.replace('_', ' ').title()),
         )
