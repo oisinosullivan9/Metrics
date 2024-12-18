@@ -70,7 +70,7 @@ class MetricsUploader:
                 endpoint, 
                 json=metrics, 
                 headers={'Content-Type': 'application/json'},
-                timeout=10  # 10-second timeout
+                timeout=5  # 10-second timeout
             )
             
             # Check response

@@ -9,7 +9,7 @@ server:
 # Client Configuration
 client:
   device_name_prefix: metrics-device
-  metrics_interval_seconds: 5
+  metrics_interval_seconds: 2
   max_retry_attempts: 3
   retry_delay_seconds: 1
 
