@@ -2,15 +2,16 @@
 server:
   host: device-metrics.onrender.com
   port: 443
-  endpoint: /metrics
+  pc_metrics_endpoint: https://device-metrics.onrender.com/metrics
+  esp32_metrics_endpoint: https://device-metrics.onrender.com/metrics
   protocol: https
 
 # Client Configuration
 client:
-  device_name_prefix: client
-  metrics_interval_seconds: 5
+  device_name_prefix: metrics-device
+  metrics_interval_seconds: 10
   max_retry_attempts: 3
-  retry_delay_seconds: 5
+  retry_delay_seconds: 1
 
 # Logging Configuration
 logging:
