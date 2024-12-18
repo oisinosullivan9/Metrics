@@ -3,7 +3,7 @@ server:
   host: device-metrics.onrender.com
   port: 443
   pc_metrics_endpoint: https://device-metrics.onrender.com/metrics
-  esp32_metrics_endpoint: https://device-metrics.onrender.com/metrics
+  esp32_metrics_endpoint: https://device-metrics.onrender.com/esp32metrics
   protocol: https
 
 # Client Configuration
