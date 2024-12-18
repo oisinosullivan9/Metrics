@@ -1,3 +1,9 @@
+# description: This script collects system performance metrics and saves them to a file in a queue directory.
+# The script is designed to run continuously and collect metrics at regular intervals.
+# The metrics are saved in JSON format with the device name, number of threads, number of processes, RAM usage, and timestamp.
+# The script logs the collected metrics and any errors that occur during processing.
+# The script can be run as a standalone program and will collect metrics at the specified interval.
+
 import os
 import time
 import logging

@@ -1,3 +1,8 @@
+# Description: This script reads metrics files from the queue directory and sends them to the server.
+# The script is designed to run continuously and process the queue at regular intervals.
+# The script reads metrics files from the queue directory, determines the endpoint based on the filename, and sends the metrics to the server.
+# The script logs the processing of each file and any errors that occur during processing.
+
 import os
 import time
 import json

@@ -1,3 +1,12 @@
+# description: This script listens for UDP packets from an ESP32 device and saves the temperature readings to a file in a queue directory.
+# The script is designed to run continuously and save the metrics to a file each time a packet is received.
+# The metrics are saved in JSON format with the device name, temperature reading, and timestamp.
+# The script also logs the received messages and any errors that occur during processing.
+# The script can be run as a standalone program and will listen for packets on the specified host and port.
+# The queue directory is created if it does not exist, and the metrics are saved to a file with a unique filename based on the timestamp.
+# The script can be stopped by pressing Ctrl+C, which will close the UDP socket and exit the program.
+
+#define imports
 import os
 import socket
 import time
@@ -6,6 +15,7 @@ import json
 import logging
 
 class ESP32MetricsCollector:
+
     def __init__(self, host="192.168.197.61", port=12345, queue_dir='metrics_queue'):
         # Configure UDP socket
         self.host = host
@@ -34,7 +44,7 @@ class ESP32MetricsCollector:
         console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         logger.addHandler(console_handler)
 
-        # File handler
+        # File handler 
         file_handler = logging.FileHandler(os.path.join(log_dir, 'esp32_metrics.log'))
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         logger.addHandler(file_handler)
@@ -96,13 +106,16 @@ class ESP32MetricsCollector:
                         self.logger.warning(f"Unrecognized message format: {message}")
                 except (ValueError, TypeError) as e:
                     self.logger.error(f"Error processing received data: {e}")
+        # Handle keyboard interrupt            
         except KeyboardInterrupt:
             self.logger.info("Exiting...")
         finally:
             self.sock.close()
 
 def main():
+    # Create an instance of the ESP32MetricsCollector class
     collector = ESP32MetricsCollector()
+    # Run the metrics collection process
     collector.run()
 
 if __name__ == "__main__":

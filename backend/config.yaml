@@ -8,7 +8,7 @@ server:
 
 # Client Configuration
 client:
-  device_name_prefix: metrics-device
+  device_name_prefix: laptop
   metrics_interval_seconds: 5
   max_retry_attempts: 3
   retry_delay_seconds: 1

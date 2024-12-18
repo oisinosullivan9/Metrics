@@ -1,3 +1,9 @@
+# Description: This file contains the main code for the Metrics application. 
+# It includes the Flask endpoints for receiving and retrieving device metrics, as well as the integration with Dash for the dashboard.
+# The application also includes ORM models for storing device performance and ESP32 temperature metrics in a SQLite database.
+# The application is configured using a YAML file, and logging is set up with console and file handlers.
+
+# Import required libraries
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -11,7 +17,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.graph_objs as go
 
-# Load configuration
+# Load configuration from a YAML file
 def load_config(config_path='config.yaml'):
     with open(config_path, 'r') as file:
         return yaml.safe_load(file)
@@ -53,7 +59,7 @@ db = SQLAlchemy(app)
 # Setup logging
 logger = setup_logging(config)
 
-#new ORM model for esp32 temperature metrics
+#ORM model for esp32 temperature metrics
 class ESP32TemperatureSnapshot(db.Model):
     __tablename__ = 'esp32_temperature_snapshot'
     
@@ -132,6 +138,7 @@ def get_metrics():
         device_name = request.args.get('device_name')
         limit = request.args.get('limit', default=100, type=int)
         if device_name:
+            # Filter by device name, order by timestamp, and limit the results
             snapshots = DevicePerformanceSnapshot.query \
                 .filter_by(device_name=device_name) \
                 .order_by(DevicePerformanceSnapshot.timestamp.desc()) \
@@ -142,7 +149,7 @@ def get_metrics():
                 .order_by(DevicePerformanceSnapshot.timestamp.desc()) \
                 .limit(limit) \
                 .all()
-        
+            
         logger.info(f'Retrieved {len(snapshots)} metrics{" for device " + device_name if device_name else ""}')
         return jsonify({'status': 'success', 'metrics': [snapshot.to_dict() for snapshot in snapshots]}), 200
     
@@ -150,7 +157,7 @@ def get_metrics():
         logger.error(f'Error retrieving metrics: {str(e)}')
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# New endpoint for ESP32 metrics
+# endpoint for ESP32 metrics
 @app.route('/esp32metrics', methods=['POST'])
 def receive_esp32_metrics():
     try:
@@ -210,7 +217,7 @@ def get_esp32_metrics():
     
 # Integrate Dash with Flask
 dash_app = dash.Dash(__name__, server=app, url_base_pathname='/dashboard/')
-
+# Dash layout
 dash_app.layout = html.Div([
     html.H1("Device Performance Dashboard"),
     html.Div([
@@ -286,6 +293,7 @@ def update_device_dropdown(_):
     [Input('device-dropdown', 'value'),
         Input('metric-dropdown-gauge', 'value')]
 )
+# Update the gauge chart based on the selected device and metric
 def update_gauge(device_name, selected_metric):
     if not device_name or not selected_metric:
         return go.Figure()
@@ -333,7 +341,7 @@ def update_gauge(device_name, selected_metric):
             'title': "Number of Processes"
         },
         'temperature': {
-            'range': [0, 45],  # Adjust range as per your expected temperature values
+            'range': [0, 45], 
             'steps': [
                 {'range': [0, 15], 'color': "lightgreen"},
                 {'range': [15, 30], 'color': "yellow"},
@@ -345,7 +353,7 @@ def update_gauge(device_name, selected_metric):
 
     config = metric_configs.get(selected_metric, {})
 
-    # Get the value differently for temperature vs other metrics
+    # Get the value differently for temperature vs other metrics, as temperature is stored directly
     if selected_metric == 'temperature':
         value = snapshot.temperature
     else:
@@ -453,3 +461,5 @@ if __name__ == '__main__':
     server_config = config['server']
     logger.info(f"Starting server on {server_config['host']}:{server_config['port']}")
     app.run(debug=True, host=server_config['host'], port=server_config['port'])
+
+
