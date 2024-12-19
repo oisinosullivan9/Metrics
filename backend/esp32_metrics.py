@@ -16,7 +16,7 @@ import logging
 
 class ESP32MetricsCollector:
 
-    def __init__(self, host="192.168.251.61", port=12345, queue_dir='metrics_queue'): #change ip as required
+    def __init__(self, host="192.168.42.61", port=12345, queue_dir='metrics_queue'): #change ip as required
         # Configure UDP socket
         self.host = host
         self.port = port
