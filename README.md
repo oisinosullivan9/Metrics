@@ -25,9 +25,8 @@ This project is a system performance and temperature monitoring application that
 ### Setup
 
 1. clone the repository:
-        ```bash
+     ```bash
     git clone https://github.com/oisinosullivan9/Metrics.git
-    cd ./Metrics/
     ```
 
 2. install dependencies
